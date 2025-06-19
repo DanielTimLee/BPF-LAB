@@ -1,0 +1,47 @@
+#!/bin/sh
+
+reboot() { echo b > /proc/sysrq-trigger; }
+hostname "v$(uname -r | sed 's|\.|_|')"
+
+export PATH=$PATH:/usr/sbin  # bpftool
+export BPF_FS=/sys/fs/bpf
+export -f reboot
+
+mount -t devtmpfs none  /dev  2>/dev/null || true
+mount -t proc     none  /proc
+mount -t sysfs    none  /sys
+mount -t tmpfs    tmpfs /tmp
+
+mkdir -p $BPF_FS
+mount -t bpf      bpf   $BPF_FS
+
+# Run custom command after 'manual=' if given, else run resize
+CMD=$(cat /proc/cmdline | awk -F 'manual=[^ ]* ' '{print $2}')
+[ -n "$CMD" ] && sh -c "$CMD" || resize || true
+
+# Populate BPF_MAP_TYPE_PROG_ARRAY with preload.bpf.o
+MAP=$BPF_FS/progs
+KEY="0x0b 0x00 0x00 0x00" # 0x0b(11)
+TAIL_PROG=$BPF_FS/tail_target
+export MAP KEY TAIL_PROG
+
+bpftool prog loadall /preload.bpf.o /sys/fs/bpf pinmaps /sys/fs/bpf
+bpftool map update pinned $MAP key $KEY value pinned $TAIL_PROG
+TAIL_PROG_ID=$(bpftool map lookup pinned $MAP key $KEY | jq .value)
+TAIL_PROG_NAME=$(bpftool prog show id $TAIL_PROG_ID -j | jq .name)
+echo "$MAP populated with $TAIL_PROG_NAME($TAIL_PROG_ID)"
+
+# Kernel JIT Log dump
+# echo 2 > /proc/sys/net/core/bpf_jit_enable
+
+# Replace colon(:) with patch command, if any
+#
+# e.g. load out_bound bpf program
+# bpftool prog loadall /out_bound.bpf.o /sys/fs/bpf
+#
+# e.g. load in_bound bpf program with populated BPF_MAP_TYPE_PROG_ARRAY
+# bpftool prog loadall /in_bound.bpf.o /sys/fs/bpf map name progs pinned $MAP
+:
+
+grep -q "manual=1" /proc/cmdline && /bin/bash
+reboot

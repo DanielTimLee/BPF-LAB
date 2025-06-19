@@ -52,4 +52,8 @@ Mkfile.old
 dkms.conf
 **/.cache/
 *.img
+.config
 compile_commands.json
+.init
+linux/
+src/

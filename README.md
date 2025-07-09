@@ -1020,7 +1020,7 @@ struct tnum {
 };
 ```
 
-The `tnum` acts as a symbolic bitmask representation. The range of possible values is **`[value, (value | mask)]`**:
+The `tnum` acts as a symbolic bitmask representation.
 
 **Example: `tnum_range(8, 12)`**
 
@@ -1037,6 +1037,8 @@ max = 0b1100  (12)
 From this range, tnum infers:
 * `value = 8 (0b1000)`: Bit 3 is known to be `1`
 * `mask  = 7 (0b0111)`: Bits 0–2 are unknown and can be anything
+
+In this case the range of possible values is **`[value, (value | mask)]`**
 
 However, this creates an **over-approximation**. The register could theoretically hold any value in the range [8, 15]:
 
